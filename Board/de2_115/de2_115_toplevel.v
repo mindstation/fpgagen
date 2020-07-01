@@ -1,6 +1,6 @@
 /********************************************/
-/* minimig_de2_top.v                        */
-/* Altera DE2 FPGA Top File                 */
+/* de2_115_toplevel.v                       */
+/* Altera DE2-115 FPGA Top File             */
 /*                                          */
 /* 2012, rok.krajnc@gmail.com               */
 /********************************************/
@@ -8,9 +8,11 @@
 
 module de2_115_toplevel (
   // clock inputs
-  input wire 		CLOCK_27, // 27 MHz
   input wire 		CLOCK_50, // 50 MHz
   input wire 		EXT_CLOCK, // External Clock
+  //TV Decoder as 27MHz source
+  input wire 		TD_CLK27, // 27 MHz
+  output wire 		TD_RESET_N,
   // USB JTAG Link
   input wire 		TDI, // CPLD -> FPGA (data in)
   input wire 		TCK, // CPLD -> FPGA (clk)
@@ -20,7 +22,7 @@ module de2_115_toplevel (
   input wire [ 4-1:0] 	KEY, // Pushbutton[3:0]
   // switch inputs
   input wire [ 10-1:0] 	SW, // Toggle Switch[9:0]
-  // 7-seg display outputs
+  // 7-seg display outputs - not used
   output wire [ 7-1:0] 	HEX0, // Seven Segment Digit 0
   output wire [ 7-1:0] 	HEX1, // Seven Segment Digit 1
   output wire [ 7-1:0] 	HEX2, // Seven Segment Digit 2
@@ -37,14 +39,14 @@ module de2_115_toplevel (
   // PS2
   inout wire 		PS2_DAT, // PS2 Keyboard Data
   inout wire 		PS2_CLK, // PS2 Keyboard Clock
-  inout wire 		PS2_MDAT, // PS2 Mouse Data
-  inout wire 		PS2_MCLK, // PS2 Mouse Clock
+  inout wire 		PS2_DAT2, // PS2 Mouse Data
+  inout wire 		PS2_CLK2, // PS2 Mouse Clock
   // VGA
   output wire 		VGA_HS, // VGA H_SYNC
   output wire 		VGA_VS, // VGA V_SYNC
-  output wire [ 10-1:0] VGA_R, // VGA Red[3:0]
-  output wire [ 10-1:0] VGA_G, // VGA Green[3:0]
-  output wire [ 10-1:0] VGA_B, // VGA Blue[3:0]
+  output wire [ 8-1:0] VGA_R, // VGA Red[7:0]
+  output wire [ 8-1:0] VGA_G, // VGA Green[7:0]
+  output wire [ 8-1:0] VGA_B, // VGA Blue[7:0] DE2_115 uses 8-bit VGA DAC.
   output wire           VGA_SYNC,
   output wire           VGA_BLANK,
   output wire           VGA_CLK,
@@ -56,14 +58,13 @@ module de2_115_toplevel (
   output wire 		AUD_DACDAT, // Audio CODEC DAC Data
   inout wire 		AUD_BCLK, // Audio CODEC Bit-Stream Clock
   output wire 		AUD_XCK, // Audio CODEC Chip Clock
-  // SD Card
-  input wire 		SD_DAT, // SD Card Data            - spi MISO
-  output wire 		SD_DAT3, // SD Card Data 3          - spi CS
+  // SD Card - works by ZPU (firmware isn't ready)
+  inout wire [ 4-1:0]	SD_DAT, //SD_DAT[0] - spi MISO, SD_DAT[3] - spi CS.
   output wire 		SD_CMD, // SD Card Command Signal  - spi MOSI
   output wire 		SD_CLK, // SD Card Clock           - spi CLK
-  // SRAM
+  // SRAM - not used
   inout wire [ 16-1:0] 	SRAM_DQ, // SRAM Data bus 16 Bits
-  output wire [ 18-1:0] SRAM_ADDR, // SRAM Address bus 18 Bits
+  output wire [ 20-1:0] SRAM_ADDR, // SRAM Address bus 20 Bits
   output wire 		SRAM_UB_N, // SRAM High-byte Data Mask
   output wire 		SRAM_LB_N, // SRAM Low-byte Data Mask
   output wire 		SRAM_WE_N, // SRAM Write Enable
@@ -71,20 +72,18 @@ module de2_115_toplevel (
   output wire 		SRAM_OE_N, // SRAM Output Enable
   // SDRAM
   inout wire [ 16-1:0] 	DRAM_DQ, // SDRAM Data bus 16 Bits
-  output wire [ 12-1:0] DRAM_ADDR, // SDRAM Address bus 12 Bits
-  output wire 		DRAM_LDQM, // SDRAM Low-byte Data Mask
-  output wire 		DRAM_UDQM, // SDRAM High-byte Data Mask
+  output wire [ 13-1:0] DRAM_ADDR, // SDRAM Address bus 13 Bits
+  output wire [ 4-1:0]	DRAM_DQM, // SDRAM Hight and Low-bytes Data Mask for two SD-RAM chips
   output wire 		DRAM_WE_N, // SDRAM Write Enable
   output wire 		DRAM_CAS_N, // SDRAM Column Address Strobe
   output wire 		DRAM_RAS_N, // SDRAM Row Address Strobe
   output wire 		DRAM_CS_N, // SDRAM Chip Select
-  output wire 		DRAM_BA_0, // SDRAM Bank Address 0
-  output wire 		DRAM_BA_1, // SDRAM Bank Address 1
+  output wire [ 2-1:0]	DRAM_BA, // SDRAM Bank Address 0 and 1
   output wire 		DRAM_CLK, // SDRAM Clock
   output wire 		DRAM_CKE, // SDRAM Clock Enable
-  // FLASH
+  // FLASH - not used
   inout wire [ 8-1:0] 	FL_DQ, // FLASH Data bus 8 Bits
-  output wire [ 22-1:0] FL_ADDR, // FLASH Address bus 22 Bits
+  output wire [ 23-1:0] FL_ADDR, // FLASH Address bus 23 Bits
   output wire 		FL_WE_N, // FLASH Write Enable
   output wire 		FL_RST_N, // FLASH Reset
   output wire 		FL_OE_N, // FLASH Output Enable
@@ -207,12 +206,12 @@ wire PS2K_CLK_OUT;
 assign PS2_CLK = (PS2K_CLK_OUT == 1'b0) ? 1'b0 : 1'bz;
 
 // PS/2 Mouse
-wire PS2M_DAT_IN=PS2_MDAT;
+wire PS2M_DAT_IN=PS2_DAT2;
 wire PS2M_DAT_OUT;
-assign PS2_MDAT = (PS2M_DAT_OUT == 1'b0) ? 1'b0 : 1'bz;
-wire PS2M_CLK_IN=PS2_MCLK;
+assign PS2_DAT2 = (PS2M_DAT_OUT == 1'b0) ? 1'b0 : 1'bz;
+wire PS2M_CLK_IN=PS2_CLK2;
 wire PS2M_CLK_OUT;
-assign PS2_MCLK = (PS2M_CLK_OUT == 1'b0) ? 1'b0 : 1'bz;
+assign PS2_CLK2 = (PS2M_CLK_OUT == 1'b0) ? 1'b0 : 1'bz;
 
 
 // assign unused outputs
@@ -237,10 +236,10 @@ assign AUDIORIGHT       = audio_right;
 //assign AUDIORIGHT       = 1'b0;
 
 // ctrl
-assign SPI_DI           = !SPI_CS_N[0] ? SD_DAT : sdo;
+assign SPI_DI           = !SPI_CS_N[0] ? SD_DAT[0] : sdo;
 
 // clock
-assign pll_in_clk       = CLOCK_27;
+assign pll_in_clk       = CLOCK_50;
 
 // reset
 assign pll_rst          = !SW[0];
@@ -251,9 +250,9 @@ wire [7:0] vga_green;
 wire [7:0] vga_blue;
 
 // DE2 specific VGA wiring
-assign VGA_R = {vga_red[7:4], vga_red[7:4], vga_red[7:6]};
-assign VGA_G = {vga_green[7:4], vga_green[7:4], vga_green[7:6]};
-assign VGA_B = {vga_blue[7:4], vga_blue[7:4], vga_blue[7:6]};
+assign VGA_R = vga_red;
+assign VGA_G = vga_green;
+assign VGA_B = vga_blue;
 assign VGA_BLANK = 1'b1; // (VGA_HS && VGA_VS);
 assign VGA_SYNC = 0;
 assign VGA_CLK = memclk; //DRAM_CLK;
@@ -263,7 +262,7 @@ assign VGA_CLK = memclk; //DRAM_CLK;
 
 pll mypll
 (
-	.inclk0(CLOCK_27),
+	.inclk0(pll_in_clk),
 	.c0(sysclk),
 	.c1(memclk),
 	.c2(DRAM_CLK)
@@ -313,19 +312,21 @@ audio_top audio_top (
 defparam myvt.rowAddrBits = 12;
 defparam myvt.colAddrBits = 8;
 
+assign DRAM_ADDR[12] = 1'b0;
+
 Virtual_Toplevel myvt
 (
 	.reset(SW[0]^!KEY[0]),
 	.MCLK(sysclk),
 	.SDR_CLK(memclk),
 
-	.DRAM_ADDR(DRAM_ADDR),
+	.DRAM_ADDR(DRAM_ADDR[11:0]),
 	.DRAM_DQ(DRAM_DQ),
-	.DRAM_BA_1(DRAM_BA_1),
-	.DRAM_BA_0(DRAM_BA_0),
+	.DRAM_BA_1(DRAM_BA[1]),
+	.DRAM_BA_0(DRAM_BA[0]),
 	.DRAM_CKE(DRAM_CKE),
-	.DRAM_UDQM(DRAM_UDQM),
-	.DRAM_LDQM(DRAM_LDQM),
+	.DRAM_UDQM(DRAM_DQM[1]),
+	.DRAM_LDQM(DRAM_DQM[0]),
 	.DRAM_CS_N(DRAM_CS_N),
 	.DRAM_WE_N(DRAM_WE_N),
 	.DRAM_CAS_N(DRAM_CAS_N),
@@ -354,8 +355,8 @@ Virtual_Toplevel myvt
 	.joyb({2'b11,Joyb[5:4],Joyb[0],Joyb[1],Joyb[2],Joyb[3]}),
 
 	// SD card
-	.spi_cs(SD_DAT3),
-	.spi_miso(SD_DAT),
+	.spi_cs(SD_DAT[3]),
+	.spi_miso(SD_DAT[0]),
 	.spi_mosi(SD_CMD),
 	.spi_clk(SD_CLK),
 );
