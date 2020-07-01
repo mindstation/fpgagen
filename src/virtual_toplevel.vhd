@@ -2111,7 +2111,7 @@ mycontrolmodule : entity work.CtrlModule
 		reset_n => reset,
 
 		-- SPI signals
-		spi_miso	=> spi_miso,
+		spi_miso => spi_miso,
 		spi_mosi => spi_mosi,
 		spi_clk => spi_clk,
 		spi_cs => spi_cs,
